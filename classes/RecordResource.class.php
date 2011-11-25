@@ -79,8 +79,7 @@ class RecordResource extends TokenResource {
 					continue;
 				}
 
-				$validator = new RecordValidator();
-				$validator->initialize($d);
+				$validator = new RecordValidator($d);
 				$validator->record_type = "TEMPLATE";
 
 				if (!$validator->validates()) {
@@ -101,8 +100,7 @@ class RecordResource extends TokenResource {
 					continue;
 				}
 
-				$validator = new RecordValidator();
-				$validator->initialize($d);
+				$validator = new RecordValidator($d);
 
 				if (!$validator->validates()) {
 					$output[] = sprintf("Validation errors in record %d:", $i);

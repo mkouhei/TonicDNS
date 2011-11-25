@@ -24,7 +24,8 @@ define("VALID_NAME", "#^[\w_-]+$#");
 define("VALID_STRING", "#^[\w -+.]*$#");
 define("VALID_QUOTED", "#^[\"']{1}.*[\"']{1}$#");
 define("VALID_TOKEN", "#^[0-9a-f]{40}$#");
-define("VALID_ZONE_TYPE", "#MASTER|SLAVE|NATIVE#");
+define("VALID_HEX_40", "#^[0-9a-f]{40}$#i");
+define("VALID_ZONE_TYPE", "#^MASTER$|^SLAVE$|^NATIVE$#");
 if (ValidatorConfig::BIND_COMPATABILITY === true) {
 	define("VALID_DOMAIN", "#^(?:[A-Z0-9](?:[A-Z0-9\-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}[\.]?$#i");
 } else {
@@ -98,9 +99,8 @@ class TemplateValidator extends Validator {
 
 		$errors = array();
 		foreach ($entries as $entry) {
-			$record = new RecordValidator();
+			$record = new RecordValidator($entry);
 			$record->record_type = "TEMPLATE";
-			$record->initialize($entry);
 
 			if (!$record->validates()) {
 				$errors[] = $record->getFormattedErrors();
@@ -221,6 +221,7 @@ class ZoneValidator extends Validator {
 			if ($entry instanceof stdClass) {
 				if (!isset($entry->identifier)) {
 					$errors[] = "Zone template identifier was not set.";
+					continue;
 				}
 				$template->identifier = $entry->identifier;
 			} else {
@@ -248,8 +249,7 @@ class ZoneValidator extends Validator {
 
 		$errors = array();
 		foreach ($records as $entry) {
-			$record = new RecordValidator();
-			$record->initialize($entry);
+			$record = new RecordValidator($entry);
 
 			if (!$record->validates()) {
 				$errors[] = $record->getFormattedErrors();
@@ -268,11 +268,12 @@ class ZoneValidator extends Validator {
 class RecordValidator extends Validator {
 	public $record_type = "NORMAL";
 
-	public function __construct() {
+	public function __construct($data = null) {
 		$r = VALID_RECORD_TYPE;
 		$r = str_replace(array("#", "^", "$"), array("", "", ""), $r);
 		$records = explode("|", $r);
 		$this->rules['type']['valid_type']['message'] .= implode(", ", $records) . ".";
+		parent::__construct($data);
 	}
 
 	protected $rules = array(
@@ -338,7 +339,7 @@ class RecordValidator extends Validator {
 		}
 
 		if (!isset($this->type) || empty($this->type)) {
-			return false;
+			return $prefix . "Type may never be empty.";
 		}
 
 		switch ($this->type) {
@@ -385,19 +386,19 @@ class RecordValidator extends Validator {
 				case 0:
 				case 1:
 					if (!ctype_digit($parts[$i])) {
-						return $prefix . "NAPTR record part $i must be a valid integer.";
+						return $prefix . sprintf("NAPTR record part %d must be a valid integer.", $i+1);
 					}
 					break;
 				case 2:
 				case 3:
 				case 4:
 					if (preg_match(VALID_QUOTED, $parts[$i]) === 0) {
-						return $prefix . "NAPTR record part $i must be a valid quoted string.";
+						return $prefix . sprintf("NAPTR record part %d must be a valid quoted string.", $i+1);
 					}
 					break;
 				case 5:
 					if (preg_match(VALID_NOTEMPTY, $parts[$i]) === 0) {
-						return $prefix . "NAPTR record part $i must be a valid record pointer, or a single dot (.).";
+						return $prefix . sprintf("NAPTR record part %d must be a valid record pointer, or a single dot (.).", $i+1);
 					}
 					break;
 				}
@@ -438,7 +439,7 @@ class RecordValidator extends Validator {
 				case 5:
 				case 6:
 					if (!ctype_digit($parts[$i])) {
-						return "SOA record part $i must be a valid integer.";
+						return sprintf("SOA record part %d must be a valid integer.", $i+1);
 					}
 					break;
 				}
@@ -464,7 +465,7 @@ class RecordValidator extends Validator {
 			for ($i = 0; $i < count($parts); $i++) {
 				switch ($i) {
 				case 0:
-					if ($parts[$i] != "1" || $parts[$i] != "2") {
+					if ($parts[$i] != "1" && $parts[$i] != "2") {
 						return $prefix . "A SSHFP record must provide either 1 (RSA) or 2 (DSA) as algorithm.";
 					}
 					break;
@@ -474,8 +475,8 @@ class RecordValidator extends Validator {
 					}
 					break;
 				case 2:
-					if (strlen($parts[$i]) !== 40) {
-						return $prefix . "A SSHFTP record must provide a fingerprint as a 40 character ASCII hexadecimal string.";
+					if (!preg_match(VALID_HEX_40, $parts[$i])) {
+						return $prefix . "A SSHFP record must provide a fingerprint as a 40 character ASCII hexadecimal string.";
 					}
 					break;
 				}
@@ -494,7 +495,7 @@ class RecordValidator extends Validator {
 				case 0:
 				case 1:
 					if (!ctype_digit($parts[$i])) {
-						return $prefix . "SRV record part $i must be a valid integer.";
+						return $prefix . sprintf("SRV record part %d must be a valid integer.", $i+1);
 					}
 					break;
 				case 2:
